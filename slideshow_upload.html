@@ -1,0 +1,245 @@
+
+    <style type="text/css">
+        img.slide-image {
+            margin: 5px 10px;
+        }
+
+        div#lightbox {
+            position: absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background: rgba(0,0,0,.8);
+            text-align: center;
+        }
+
+        a#lightbox-close,a#lightbox-close:visited {
+            color:white;
+            text-decoration: none;
+			font-size:16px;
+        }
+
+        img#large-image{
+            margin:auto;
+            height:400px;
+            display:block;
+            margin-top:40px;
+        }
+    </style>
+
+      <script type="text/javascript">
+         (function(){
+          window.URL = window.URL || window.webkitURL;
+          var intervalID,images, numImages, largeImg, dragElement, dragStartX, dragStartY;
+          var dispImg = 1;
+
+          //create new obj to hold our images
+          var ImageList = function() {this.list = [];};
+
+          //add an item to the list by passing the file and the event
+          ImageList.prototype.addItem = function(item, event){
+              var position;
+              //empty list
+              if(this.list.length == 0){
+                this.list.push(item);
+                position = 0;
+              } else {
+                  for(var i=0;i<this.list.length;i++){
+                      //first item
+                      if(i == 0 && event.pageX < this.list[i].position.left ){
+                          this.list.unshift(item);
+                          position = i;
+                          break;
+                      //last item
+                      } else if(i == this.list.length-1 && event.pageX > this.list[i].position.right){
+                          this.list.push(item);
+                          position = i+1;
+                          break;
+                      //middle
+                      } else if(event.pageX > this.list[i].position.left && (this.list.length == 1 || event.pageX < this.list[i+1].position.right)){
+                          var tmpArr = this.list.splice(0,i+1,item);
+                          this.list = tmpArr.concat(this.list);
+                          position = i+1;
+                          break;
+                      }
+                  }
+              }
+              var file = document.createElement('img');
+              file.setAttribute('src', window.URL.createObjectURL(item));
+              file.setAttribute('height',60);
+              file.setAttribute('width',60);
+              file.setAttribute('class','slide-image');
+              this.list[position].dom = file;
+          };
+
+          //remove specified element and return it
+          ImageList.prototype.removeItem = function(index){
+              var tmpArr = this.list.splice(index,1);
+              dropzone.removeChild(tmpArr[0].dom);
+              return tmpArr[0];
+          };
+
+          ImageList.prototype.render = function(){
+              //remove all images to reset positions
+               for(var i=0;i<this.list.length;i++){
+                   if(this.list[i].dom.parentNode !== null){
+                        dropzone.removeChild(this.list[i].dom);
+                   }
+               }
+            //go through list and insert dom attr
+            for(var i=0;i<this.list.length;i++){
+                this.list[i].dom.setAttribute('data-position',i);
+                dropzone.appendChild(this.list[i].dom);
+                //update positions
+                var y = findPosY(this.list[i].dom), x = findPosX(this.list[i].dom);
+                this.list[i].position = {'top': y,'bottom':y+60,'left':x,'right':x+60};
+            }
+          };
+
+          //create list
+          var imgs = new ImageList();
+
+          //find abaolute x position of an element
+          function findPosX(obj)
+            {
+                var left = 0;
+                if(obj.offsetParent)
+                {
+                    while(1)
+                    {
+                      left += obj.offsetLeft;
+                      if(!obj.offsetParent)
+                        break;
+                      obj = obj.offsetParent;
+                    }
+                }
+                else if(obj.x)
+                {
+                    left += obj.x;
+                }
+                return left;
+            }
+
+            //find absoulte y pos of an element
+            function findPosY(obj)
+            {
+                var top = 0;
+                if(obj.offsetParent)
+                {
+                    while(1)
+                    {
+                      top += obj.offsetTop;
+                      if(!obj.offsetParent)
+                        break;
+                      obj = obj.offsetParent;
+                    }
+                }
+                else if(obj.y)
+                {
+                    top += obj.y;
+                }
+                return top;
+              }
+
+              //get the position in the list by the dom node
+              function getListPositionByDom(domnode){
+                  for(var i=0;i<imgs.list.length;i++){
+                      if(imgs.list[i].dom == domnode){
+                          return i;
+                      }
+                  }
+              }
+
+          window.onload = function(){
+              var dropzone = document.getElementById('dropzone');
+              dropzone.addEventListener('dragstart',dragstart,false);
+              dropzone.addEventListener('dragenter',dragenter,false);
+              dropzone.addEventListener('dragover',dragover,false);
+              dropzone.addEventListener('drop',drop,false);
+
+              var play = document.getElementById('play');
+              play.addEventListener('click',playSlideshow,false);
+
+              var close = document.getElementById('lightbox-close');
+              close.addEventListener('click', function(e){
+                  e.preventDefault();
+                  clearInterval(intervalID);
+                  e.target.parentNode.parentNode.setAttribute('style','display:none');
+                  window.history.replaceState({},'Photo App','http://david-franklin.net/project/slideshow');
+              }, false);
+
+              largeImg = document.getElementById('large-image');
+
+          };
+
+          dragstart = function(e){
+              dragElement = e.srcElement;
+              dragStartX = e.x;
+              dragStartY = e.y;
+              //e.stopPropagation();
+              //e.preventDefault();
+          }
+
+          dragenter = function(e){
+              e.stopPropagation();
+              e.preventDefault();
+          };
+
+          dragover = function(e){
+              e.stopPropagation();
+              e.preventDefault();
+          };
+
+          drop = function(e){
+              e.stopPropagation();
+              e.preventDefault();
+              var files = e.dataTransfer.files;
+              if(files.length){    //files dragged from local system
+                  for(var i=0;i<files.length;i++){
+                      imgs.addItem(files[i],e);
+                      imgs.render();
+                      
+                  }
+              } else {  //files dragged within dropzone
+                  var pos = getListPositionByDom(dragElement);
+                  imgs.addItem(imgs.removeItem(pos),e);
+                  imgs.render();
+              }              
+          };
+
+          playSlideshow = function(e){
+              e.preventDefault();
+              images = document.querySelectorAll('img.slide-image');
+              numImages = images.length;
+              var timer = document.getElementById('intervalTimer').value * 1000;
+              document.getElementById('lightbox').setAttribute('style','display:block');
+              largeImg.src = images[0].src;
+              intervalID = setInterval(slideshowNext,timer);
+          };
+
+          slideshowNext = function(){
+              var showImg = dispImg % numImages;
+              largeImg.src = images[showImg].src;
+              dispImg++;
+              window.history.replaceState({},imgs.list[showImg].fileName,imgs.list[showImg].fileName);
+          };
+
+          
+         })();
+         function showInterval(val){
+              document.getElementById('intervalDisplay').innerHTML = val;
+          }
+      </script>
+
+    <div id="lightbox" style="display:none;">
+        <div style="margin-top:20px;"><a href="#" id="lightbox-close">Close</a></div>
+        <img src="" id="large-image"/>
+    </div>
+    Drag images to the box below:
+    <div style="width:100%;height:150px;border:1px solid black" id="dropzone"></div>
+    <label>Slideshow Interval Timer:</label>
+    <span id="intervalDisplay">3</span>
+    <input id="intervalTimer" type="range" min="1" max="10" value="3" step="1" onchange="showInterval(this.value);"/>
+    <br /><a href="#" id="play">Play Slideshow</a>
+
